@@ -1,0 +1,154 @@
+openapi: 3.1.0
+info:
+  title: Tenisu API
+  version: 1.0.0
+  description: REST API for retrieving tennis player statistics.
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+paths:
+  /api/players:
+    get:
+      operationId: listPlayers
+      summary: List players
+      description: >-
+        Returns all players ordered by ranking in ascending order (rank 1 first).
+        Player id is used as a deterministic tie-breaker.
+      responses:
+        '200':
+          description: Players retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - players
+                properties:
+                  players:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Player'
+              example:
+                players:
+                  - id: 52
+                    firstname: Novak
+                    lastname: Djokovic
+                    shortname: N.DJO
+                    sex: M
+                    country:
+                      picture: https://tenisu.latelier.co/resources/Serbie.png
+                      code: SRB
+                    picture: https://tenisu.latelier.co/resources/Djokovic.png
+                    data:
+                      rank: 2
+                      points: 2542
+                      weight: 80000
+                      height: 188
+                      age: 31
+                      last: [1, 1, 1, 1, 1]
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  schemas:
+    Player:
+      type: object
+      required:
+        - id
+        - firstname
+        - lastname
+        - shortname
+        - sex
+        - country
+        - picture
+        - data
+      properties:
+        id:
+          type: integer
+          example: 52
+        firstname:
+          type: string
+          example: Novak
+        lastname:
+          type: string
+          example: Djokovic
+        shortname:
+          type: string
+          example: N.DJO
+        sex:
+          type: string
+          enum: [M, F]
+        country:
+          type: object
+          required: [picture, code]
+          properties:
+            picture:
+              type: string
+              format: uri
+            code:
+              type: string
+              example: SRB
+        picture:
+          type: string
+          format: uri
+        data:
+          type: object
+          required: [rank, points, weight, height, age, last]
+          properties:
+            rank:
+              type: integer
+              minimum: 1
+            points:
+              type: integer
+              minimum: 0
+            weight:
+              type: integer
+              description: Weight in grams, as provided by the source dataset.
+              minimum: 0
+            height:
+              type: integer
+              description: Height in centimeters, as provided by the source dataset.
+              minimum: 0
+            age:
+              type: integer
+              minimum: 0
+            last:
+              type: array
+              description: Recent match result values as provided by the source dataset.
+              items:
+                type: integer
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [ROUTE_NOT_FOUND, INTERNAL_SERVER_ERROR]
+            message:
+              type: string
+  responses:
+    InternalServerError:
+      description: An unexpected server error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: An unexpected error occurred.
+    NotFound:
+      description: The requested route does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: ROUTE_NOT_FOUND
+              message: Route not found.

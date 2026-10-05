@@ -1,0 +1,48 @@
+{
+  "name": "tenisu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tennis player API built with Express, TypeScript, and PostgreSQL.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "node dist/database/migrate.js",
+    "db:seed": "node dist/database/seed.js"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "scarfSettings": {
+    "enabled": false
+  },
+  "packageManager": "npm@12.2.0",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "pg": "^8.13.1",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^26.6.4",
+    "@types/pg": "^8.11.10",
+    "@types/supertest": "^6.0.2",
+    "@types/swagger-ui-express": "^4.1.8",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "@scarf/scarf": false
+  }
+}
