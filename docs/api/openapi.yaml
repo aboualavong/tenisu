@@ -7,6 +7,30 @@ servers:
   - url: http://localhost:3000
     description: Local development server
 paths:
+  /api/statistics:
+    get:
+      operationId: getPlayerStatistics
+      summary: Get aggregate player statistics
+      description: >-
+        Returns the country with the highest aggregate win ratio across its players,
+        the average player BMI, and the median player height. A win is represented by
+        1 in each player's recent results. Ties are resolved by country code in
+        ascending alphabetical order. The win ratio is rounded to four decimal places
+        and the average BMI to two decimal places. Metrics are null when no players
+        are available.
+      responses:
+        '200':
+          description: Player statistics retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [statistics]
+                properties:
+                  statistics:
+                    $ref: '#/components/schemas/PlayerStatistics'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/players:
     get:
       operationId: listPlayers
@@ -99,6 +123,35 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 components:
   schemas:
+    PlayerStatistics:
+      type: object
+      required: [countryWithHighestWinRatio, averageBmi, medianHeightCm]
+      properties:
+        countryWithHighestWinRatio:
+          oneOf:
+            - type: object
+              required: [countryCode, winRatio]
+              properties:
+                countryCode:
+                  type: string
+                  example: SRB
+                winRatio:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  description: Wins divided by all recent results for players from this country.
+                  example: 0.8
+            - type: "null"
+        averageBmi:
+          type: [number, "null"]
+          minimum: 0
+          description: Arithmetic mean of player BMI values, rounded to two decimal places.
+          example: 23.42
+        medianHeightCm:
+          type: [number, "null"]
+          minimum: 0
+          description: Median player height in centimeters; the middle two heights are averaged when the player count is even.
+          example: 185
     Player:
       type: object
       required:

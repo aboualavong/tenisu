@@ -63,6 +63,20 @@ To stop the services, run `docker compose down`. Add `-v` only if you also want 
 The API contract is documented in the [OpenAPI specification](docs/api/openapi.yaml).
 When the server is running, open [http://localhost:3000/api-docs/](http://localhost:3000/api-docs/) to explore it in Swagger UI.
 
+### `GET /api/statistics`
+
+Returns aggregate player statistics in the response shape `{ "statistics": {...} }`:
+
+- `countryWithHighestWinRatio` contains the country code and the ratio of wins to recent matches aggregated across players from that country. A win is `1` in `data.last`; ties are resolved by country code in ascending alphabetical order. The ratio is rounded to four decimal places.
+- `averageBmi` is the arithmetic mean of player BMI values, using weight in grams and height in centimeters, rounded to two decimal places.
+- `medianHeightCm` is the median height in centimeters. For an even player count, it is the mean of the two middle heights.
+
+Each metric is `null` if the player dataset is empty.
+
+```bash
+curl http://localhost:3000/api/statistics
+```
+
 ### `GET /api/players`
 
 Returns all players in the response shape `{ "players": [...] }`. Players are ordered by ranking ascending (rank 1 first); player id is used as a deterministic tie-breaker.
@@ -106,14 +120,15 @@ curl http://localhost:3000/api/players/17
 
 ## Verify the API
 
-With the API running, request the player list or look up a player by ID:
+With the API running, request statistics, the player list, or look up a player by ID:
 
 ```bash
 curl http://localhost:3000/api/players
 curl http://localhost:3000/api/players/17
+curl http://localhost:3000/api/statistics
 ```
 
-The list response is JSON and contains a `players` array; the lookup response contains a `player` object. You can also try both endpoints from Swagger UI at `http://localhost:3000/api-docs/`.
+The list response is JSON and contains a `players` array; the lookup response contains a `player` object; and the statistics response contains a `statistics` object. You can also try all endpoints from Swagger UI at `http://localhost:3000/api-docs/`.
 
 ## Tests and build
 
