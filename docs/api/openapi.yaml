@@ -80,7 +80,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/InvalidPlayerIdErrorResponse'
               example:
                 error:
                   code: INVALID_PLAYER_ID
@@ -90,7 +90,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlayerNotFoundErrorResponse'
               example:
                 error:
                   code: PLAYER_NOT_FOUND
@@ -178,13 +178,57 @@ components:
               enum: [ROUTE_NOT_FOUND, PLAYER_NOT_FOUND, INVALID_PLAYER_ID, INTERNAL_SERVER_ERROR]
             message:
               type: string
+    InvalidPlayerIdErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [INVALID_PLAYER_ID]
+    PlayerNotFoundErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [PLAYER_NOT_FOUND]
+    RouteNotFoundErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [ROUTE_NOT_FOUND]
+    InternalServerErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [INTERNAL_SERVER_ERROR]
   responses:
     InternalServerError:
       description: An unexpected server error occurred.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/InternalServerErrorResponse'
           example:
             error:
               code: INTERNAL_SERVER_ERROR
@@ -194,7 +238,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/RouteNotFoundErrorResponse'
           example:
             error:
               code: ROUTE_NOT_FOUND
