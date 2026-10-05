@@ -33,4 +33,14 @@ export class PostgresPlayerRepository implements PlayerRepository {
     return result.rows.map((row) => row.player);
   }
 
+  async findById(id: number): Promise<Player | null> {
+    const result = await this.pool.query<{ player: Player }>(
+      `SELECT ${playerProjection}
+       FROM players p JOIN countries c ON c.code = p.country_code
+       WHERE p.id = $1`,
+      [id],
+    );
+    return result.rows[0]?.player ?? null;
+  }
+
 }

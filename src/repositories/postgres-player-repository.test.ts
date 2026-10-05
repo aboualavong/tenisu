@@ -11,4 +11,13 @@ describe("PostgresPlayerRepository", () => {
 
     expect(query.mock.calls[0]?.[0]).toMatch(/ORDER BY p\.rank ASC, p\.id ASC/i);
   });
+
+  it("looks up one player using a parameterized ID query", async () => {
+    const player = { id: 17 };
+    const query = vi.fn().mockResolvedValue({ rows: [{ player }] });
+    const repository = new PostgresPlayerRepository({ query } as unknown as Pool);
+
+    await expect(repository.findById(17)).resolves.toEqual(player);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("WHERE p.id = $1"), [17]);
+  });
 });

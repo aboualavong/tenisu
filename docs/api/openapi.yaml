@@ -50,6 +50,53 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/players/{id}:
+    get:
+      operationId: getPlayerById
+      summary: Get a player by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Positive integer player ID.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          example: 17
+      responses:
+        '200':
+          description: Player retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [player]
+                properties:
+                  player:
+                    $ref: '#/components/schemas/Player'
+        '400':
+          description: The player ID is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidPlayerIdErrorResponse'
+              example:
+                error:
+                  code: INVALID_PLAYER_ID
+                  message: Player ID must be a positive integer.
+        '404':
+          description: No player exists with the requested ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerNotFoundErrorResponse'
+              example:
+                error:
+                  code: PLAYER_NOT_FOUND
+                  message: Player not found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   schemas:
     Player:
@@ -128,16 +175,60 @@ components:
           properties:
             code:
               type: string
-              enum: [ROUTE_NOT_FOUND, INTERNAL_SERVER_ERROR]
+              enum: [ROUTE_NOT_FOUND, PLAYER_NOT_FOUND, INVALID_PLAYER_ID, INTERNAL_SERVER_ERROR]
             message:
               type: string
+    InvalidPlayerIdErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [INVALID_PLAYER_ID]
+    PlayerNotFoundErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [PLAYER_NOT_FOUND]
+    RouteNotFoundErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [ROUTE_NOT_FOUND]
+    InternalServerErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [INTERNAL_SERVER_ERROR]
   responses:
     InternalServerError:
       description: An unexpected server error occurred.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/InternalServerErrorResponse'
           example:
             error:
               code: INTERNAL_SERVER_ERROR
@@ -147,7 +238,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/RouteNotFoundErrorResponse'
           example:
             error:
               code: ROUTE_NOT_FOUND

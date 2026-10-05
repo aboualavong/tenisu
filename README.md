@@ -96,15 +96,24 @@ Returns all players in the response shape `{ "players": [...] }`. Players are or
 
 The API returns `404` with a `ROUTE_NOT_FOUND` error for an unknown route and `500` with an `INTERNAL_SERVER_ERROR` error when an unexpected server error occurs.
 
+### `GET /api/players/{id}`
+
+Returns one player in the response shape `{ "player": {...} }`. The path `id` must be a positive integer. An invalid ID returns `400` with `INVALID_PLAYER_ID`; a well-formed ID that does not match a player returns `404` with `PLAYER_NOT_FOUND`.
+
+```bash
+curl http://localhost:3000/api/players/17
+```
+
 ## Verify the API
 
-With the API running, request the player list:
+With the API running, request the player list or look up a player by ID:
 
 ```bash
 curl http://localhost:3000/api/players
+curl http://localhost:3000/api/players/17
 ```
 
-The response is JSON and contains a `players` array. You can also try the endpoint from Swagger UI at `http://localhost:3000/api-docs/`.
+The list response is JSON and contains a `players` array; the lookup response contains a `player` object. You can also try both endpoints from Swagger UI at `http://localhost:3000/api-docs/`.
 
 ## Tests and build
 
