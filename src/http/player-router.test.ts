@@ -83,4 +83,40 @@ describe("player API", () => {
     expect(response.body.error.code).toBe("PLAYER_NOT_FOUND");
   });
 
+  it("returns aggregate player statistics", async () => {
+    const secondPlayer: Player = {
+      ...player,
+      id: 18,
+      country: { picture: "https://example.com/fra.png", code: "FRA" },
+      data: { ...player.data, weight: 80000, height: 190, last: [1, 1, 1, 1, 1] },
+    };
+    const { app } = createTestApp([player, secondPlayer]);
+
+    const response = await request(app).get("/api/statistics");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      statistics: {
+        countryWithHighestWinRatio: { countryCode: "FRA", winRatio: 1 },
+        averageBmi: 23.5,
+        medianHeightCm: 187.5,
+      },
+    });
+  });
+
+  it("returns null statistics when there are no players", async () => {
+    const { app } = createTestApp([]);
+
+    const response = await request(app).get("/api/statistics");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      statistics: {
+        countryWithHighestWinRatio: null,
+        averageBmi: null,
+        medianHeightCm: null,
+      },
+    });
+  });
+
 });

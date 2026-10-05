@@ -1,10 +1,20 @@
 import { Router } from "express";
+import { calculatePlayerStatistics } from "../domain/player-statistics";
 import type { PlayerRepository } from "../repositories/player-repository";
 
 const maxPlayerId = 2_147_483_647;
 
 export function createPlayerRouter(repository: PlayerRepository): Router {
   const router = Router();
+
+  router.get("/statistics", async (_request, response, next) => {
+    try {
+      const players = await repository.findAll();
+      response.json({ statistics: calculatePlayerStatistics(players) });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/players", async (_request, response, next) => {
     try {
