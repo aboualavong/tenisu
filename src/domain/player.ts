@@ -20,3 +20,5 @@ export interface Player {
     last: number[];
   };
 }
+
+export type NewPlayer = Omit<Player, "id">;

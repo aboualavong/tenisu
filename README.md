@@ -18,13 +18,22 @@ npm install --global npm@12.2.0
 
 ## Run with Docker Compose
 
-Docker Compose starts PostgreSQL, builds the API image, applies the schema, loads the sample players from `headtohead.json`, and starts the API.
+Create a local environment file and configure the write key before starting the services:
+
+```bash
+cp .env.example .env
+sed -i "s/^PLAYER_WRITE_API_KEY=.*/PLAYER_WRITE_API_KEY=$(openssl rand -hex 32)/" .env
+```
+
+The generated key is stored in `.env`, which is ignored by Git. Keep it private. Docker Compose reads it and passes it to the API container. The API requires a key of at least 32 bytes for `POST /api/players`; if the key is unset or too short, player creation returns `503`.
+
+Docker Compose starts PostgreSQL, builds the API image, applies all migrations, loads the sample players from `headtohead.json`, and starts the API.
 
 ```bash
 docker compose up --build
 ```
 
-The API is available at `http://localhost:3000`. The Compose file uses local development credentials; replace them before using this configuration in a shared environment.
+The API is available at `http://localhost:3000` from Windows and WSL. In WSL 2 NAT mode, if a Windows-hosted service cannot be reached through `localhost`, use the Windows host gateway shown by `ip route show default` instead. The Compose file uses local development database credentials; replace them before using this configuration in a shared environment.
 
 To stop the services, run `docker compose down`. Add `-v` only if you also want to delete the local PostgreSQL data volume.
 
@@ -43,6 +52,8 @@ To stop the services, run `docker compose down`. Add `-v` only if you also want 
    ```
 
 3. Copy `.env.example` to `.env` and adjust `DATABASE_URL` if needed.
+
+   Set `PLAYER_WRITE_API_KEY` to a unique random secret to enable player creation. For example, generate one with `openssl rand -hex 32`. Without this key, `POST /api/players` is disabled. Keep the key private and send it only over HTTPS outside local development.
 
 4. Build the TypeScript application, apply the schema, and seed the sample data:
 
@@ -118,6 +129,28 @@ Returns one player in the response shape `{ "player": {...} }`. The path `id` mu
 curl http://localhost:3000/api/players/17
 ```
 
+### `POST /api/players`
+
+Creates a player from its complete representation. The server generates the player `id`; clients must not include it in the request body. The server compares `X-API-Key` with `PLAYER_WRITE_API_KEY` using a timing-safe comparison. The configured key must be at least 32 bytes. The body must follow the `NewPlayer` schema in the OpenAPI specification; unknown fields and invalid values are rejected. A successful request returns `201 Created`, the new player in `{ "player": {...} }`, and a `Location` header pointing to `/api/players/{id}`. Malformed JSON or an invalid player returns `400`; a missing or incorrect key returns `401`; a missing or too-short server key returns `503`. Request bodies are limited to 100 KB; larger bodies return `413`.
+
+When the country code is new, the country is inserted with the player in one transaction. If that country code already exists, its stored picture is preserved.
+
+```bash
+source .env
+curl --request POST http://localhost:3000/api/players \
+  --header "X-API-Key: $PLAYER_WRITE_API_KEY" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "firstname": "Coco",
+    "lastname": "Gauff",
+    "shortname": "C.GAU",
+    "sex": "F",
+    "country": { "picture": "https://example.com/usa.png", "code": "USA" },
+    "picture": "https://example.com/gauff.png",
+    "data": { "rank": 3, "points": 7200, "weight": 55000, "height": 175, "age": 20, "last": [1, 1, 0, 1, 1] }
+  }'
+```
+
 ## Verify the API
 
 With the API running, request statistics, the player list, or look up a player by ID:
@@ -149,7 +182,7 @@ Before merging, protect the `main` branch in GitHub repository settings: require
 
 Countries are stored separately and referenced by players through their ISO-style country code. Player ranking and physical statistics are stored as columns, while the five recent match results are stored as a constrained PostgreSQL smallint array. The seed command is repeatable and updates existing rows by id.
 
-The current migration is in `src/database/migrations/001_initial_schema.sql`. Apply it with `npm run db:migrate` after building the project.
+Migrations are in `src/database/migrations/`. `001_initial_schema.sql` creates the initial schema, and `002_player_identity.sql` enables server-generated player IDs. Docker Compose applies all migrations when the API container starts. For a local Node.js run, apply them with `npm run db:migrate` after building the project.
 
 ## Environment variables
 
@@ -159,3 +192,4 @@ The current migration is in `src/database/migrations/001_initial_schema.sql`. Ap
 | `DATABASE_URL` | None | PostgreSQL connection string; set this in `.env` when running locally. Docker Compose supplies its own value. |
 | `DATABASE_SSL` | `false` | Enable certificate-verified TLS for PostgreSQL |
 | `DATABASE_POOL_SIZE` | `10` | Maximum number of pooled database connections |
+| `PLAYER_WRITE_API_KEY` | None | Secret of at least 32 bytes required by `POST /api/players`; creation stays disabled if unset or too short. Compose reads it from `.env`. |

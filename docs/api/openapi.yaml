@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Tenisu API
   version: 1.0.0
-  description: REST API for retrieving tennis player statistics.
+  description: REST API for retrieving player statistics and managing player records.
 servers:
   - url: http://localhost:3000
     description: Local development server
@@ -32,6 +32,124 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/players:
+    post:
+      operationId: createPlayer
+      summary: Create a player
+      description: >-
+        Creates a player from its complete representation. The server generates the
+        player ID. A new country is created when its code is not yet
+        present; the stored picture is preserved when the country already exists.
+        Requires the X-API-Key header to match PLAYER_WRITE_API_KEY configured on
+        the server. The configured key must be at least 32 bytes; player creation
+        is disabled otherwise. In Swagger UI, use the Authorize control to provide
+        the same key.
+      security:
+        - PlayerWriteApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPlayer'
+            example:
+              firstname: Coco
+              lastname: Gauff
+              shortname: C.GAU
+              sex: F
+              country:
+                picture: https://example.com/usa.png
+                code: USA
+              picture: https://example.com/gauff.png
+              data:
+                rank: 3
+                points: 7200
+                weight: 55000
+                height: 175
+                age: 20
+                last: [1, 1, 0, 1, 1]
+      responses:
+        '201':
+          description: Player created successfully.
+          headers:
+            Location:
+              description: URL of the created player resource.
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [player]
+                properties:
+                  player:
+                    $ref: '#/components/schemas/Player'
+        '400':
+          description: The player representation or JSON body is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidPlayerRequestErrorResponse'
+              examples:
+                invalidPlayer:
+                  value:
+                    error:
+                      code: INVALID_PLAYER
+                      message: Request body must contain a valid player.
+                invalidJson:
+                  value:
+                    error:
+                      code: INVALID_JSON
+                      message: Request body contains invalid JSON.
+        '413':
+          description: The request body exceeds the 100 KB limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayloadTooLargeErrorResponse'
+              example:
+                error:
+                  code: PAYLOAD_TOO_LARGE
+                  message: Request body exceeds the allowed size.
+        '415':
+          description: The request body uses an unsupported media type or JSON encoding.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnsupportedPlayerRequestErrorResponse'
+              examples:
+                unsupportedMediaType:
+                  value:
+                    error:
+                      code: UNSUPPORTED_MEDIA_TYPE
+                      message: Content-Type must be application/json.
+                unsupportedJsonEncoding:
+                  value:
+                    error:
+                      code: UNSUPPORTED_JSON_ENCODING
+                      message: The request body encoding is not supported.
+        '401':
+          description: The write API key is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedErrorResponse'
+              example:
+                error:
+                  code: UNAUTHORIZED
+                  message: A valid API key is required.
+        '503':
+          description: Player creation is disabled because no sufficiently strong write API key is configured.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerCreationDisabledErrorResponse'
+              example:
+                error:
+                  code: PLAYER_CREATION_DISABLED
+                  message: Player creation requires a configured API key of at least 32 bytes.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     get:
       operationId: listPlayers
       summary: List players
@@ -122,6 +240,14 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 components:
+  securitySchemes:
+    PlayerWriteApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >-
+        Required to create a player. Configure PLAYER_WRITE_API_KEY with a secret
+        of at least 32 bytes on the server, then provide the same value here.
   schemas:
     PlayerStatistics:
       type: object
@@ -166,15 +292,23 @@ components:
       properties:
         id:
           type: integer
+          minimum: 1
+          maximum: 2147483647
           example: 52
         firstname:
           type: string
+          minLength: 1
+          maxLength: 100
           example: Novak
         lastname:
           type: string
+          minLength: 1
+          maxLength: 100
           example: Djokovic
         shortname:
           type: string
+          minLength: 1
+          maxLength: 5
           example: N.DJO
         sex:
           type: string
@@ -188,6 +322,7 @@ components:
               format: uri
             code:
               type: string
+              pattern: '^[A-Z]{3}$'
               example: SRB
         picture:
           type: string
@@ -199,25 +334,99 @@ components:
             rank:
               type: integer
               minimum: 1
+              maximum: 2147483647
             points:
               type: integer
               minimum: 0
+              maximum: 2147483647
             weight:
               type: integer
               description: Weight in grams, as provided by the source dataset.
-              minimum: 0
+              minimum: 1
+              maximum: 2147483647
             height:
               type: integer
               description: Height in centimeters, as provided by the source dataset.
-              minimum: 0
+              minimum: 1
+              maximum: 2147483647
             age:
               type: integer
-              minimum: 0
+              minimum: 1
+              maximum: 32767
             last:
               type: array
               description: Recent match result values as provided by the source dataset.
+              minItems: 5
+              maxItems: 5
               items:
                 type: integer
+                enum: [0, 1]
+    NewPlayer:
+      type: object
+      required: [firstname, lastname, shortname, sex, country, picture, data]
+      additionalProperties: false
+      properties:
+        firstname:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastname:
+          type: string
+          minLength: 1
+          maxLength: 100
+        shortname:
+          type: string
+          minLength: 1
+          maxLength: 5
+        sex:
+          type: string
+          enum: [M, F]
+        country:
+          type: object
+          required: [picture, code]
+          additionalProperties: false
+          properties:
+            picture:
+              type: string
+              format: uri
+            code:
+              type: string
+              pattern: '^[A-Z]{3}$'
+        picture:
+          type: string
+          format: uri
+        data:
+          type: object
+          required: [rank, points, weight, height, age, last]
+          additionalProperties: false
+          properties:
+            rank:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            points:
+              type: integer
+              minimum: 0
+              maximum: 2147483647
+            weight:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            height:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            age:
+              type: integer
+              minimum: 1
+              maximum: 32767
+            last:
+              type: array
+              minItems: 5
+              maxItems: 5
+              items:
+                type: integer
+                enum: [0, 1]
     ErrorResponse:
       type: object
       required: [error]
@@ -228,9 +437,64 @@ components:
           properties:
             code:
               type: string
-              enum: [ROUTE_NOT_FOUND, PLAYER_NOT_FOUND, INVALID_PLAYER_ID, INTERNAL_SERVER_ERROR]
+              enum: [ROUTE_NOT_FOUND, PLAYER_NOT_FOUND, INVALID_PLAYER_ID, INVALID_PLAYER, INVALID_JSON, PAYLOAD_TOO_LARGE, UNSUPPORTED_MEDIA_TYPE, UNSUPPORTED_JSON_ENCODING, UNAUTHORIZED, PLAYER_CREATION_DISABLED, INTERNAL_SERVER_ERROR]
             message:
               type: string
+    InvalidPlayerRequestErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [INVALID_PLAYER, INVALID_JSON]
+    PayloadTooLargeErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [PAYLOAD_TOO_LARGE]
+    UnsupportedPlayerRequestErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [UNSUPPORTED_MEDIA_TYPE, UNSUPPORTED_JSON_ENCODING]
+    UnauthorizedErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [UNAUTHORIZED]
+    PlayerCreationDisabledErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  enum: [PLAYER_CREATION_DISABLED]
     InvalidPlayerIdErrorResponse:
       allOf:
         - $ref: '#/components/schemas/ErrorResponse'
