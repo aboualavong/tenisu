@@ -32,6 +32,14 @@ async function seed(): Promise<void> {
           player.data.age, player.data.last],
       );
     }
+    await client.query(
+      `SELECT setval(
+         pg_get_serial_sequence('players', 'id'),
+         COALESCE(MAX(id), 1),
+         COUNT(*) > 0
+       )
+       FROM players`,
+    );
     await client.query("COMMIT");
     console.info(`Seeded ${input.players.length} players.`);
   } catch (error) {
