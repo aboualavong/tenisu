@@ -47,6 +47,17 @@ describe("player API", () => {
     expect(swaggerConfig.text).toContain("Tenisu API");
   });
 
+  it("targets the hosting API origin from both local and online Swagger", async () => {
+    const { app } = createTestApp();
+    const response = await request(app).get("/api-docs/swagger-ui-init.js");
+    expect(response.status).toBe(200);
+    const servers = JSON.parse(response.text.match(/"servers":\s*(\[[\s\S]*?\])/)![1]!) as { url: string }[];
+    for (const origin of ["http://localhost:3000", "https://tenisu-api-2odleubxdq-ew.a.run.app"]) {
+      const base = new URL(servers[0]!.url, `${origin}/api-docs/`);
+      expect(new URL("api/players", base).href).toBe(`${origin}/api/players`);
+    }
+  });
+
   it("lists players", async () => {
     const { app } = createTestApp();
     const response = await request(app).get("/api/players");
