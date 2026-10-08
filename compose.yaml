@@ -17,13 +17,15 @@ services:
 
   api:
     build: .
+    command: ["sh", "-c", "npm run db:setup && npm start"]
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://tenisu:tenisu@database:5432/tenisu
       DATABASE_SSL: "false"
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
       PLAYER_WRITE_API_KEY: ${PLAYER_WRITE_API_KEY:-}
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     depends_on:
       database:
         condition: service_healthy

@@ -16,4 +16,4 @@ COPY src/database/migrations ./src/database/migrations
 COPY headtohead.json ./headtohead.json
 COPY docs/api/openapi.yaml ./docs/api/openapi.yaml
 EXPOSE 3000
-CMD ["sh", "-c", "node dist/database/migrate.js && node dist/database/seed.js && node dist/server.js"]
+CMD ["npm", "start"]
