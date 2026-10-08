@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { calculatePlayerStatistics } from "../domain/player-statistics";
+import { parsePlayerInput } from "./player-input";
 import type { PlayerRepository } from "../repositories/player-repository";
 
 const maxPlayerId = 2_147_483_647;
@@ -11,6 +12,26 @@ export function createPlayerRouter(repository: PlayerRepository): Router {
     try {
       const players = await repository.findAll();
       response.json({ statistics: calculatePlayerStatistics(players) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/players", async (request, response, next) => {
+    if (!request.is("application/json")) {
+      response.status(415).json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Content-Type must be application/json." } });
+      return;
+    }
+
+    const player = parsePlayerInput(request.body);
+    if (!player) {
+      response.status(400).json({ error: { code: "INVALID_PLAYER", message: "Request body must contain a valid player." } });
+      return;
+    }
+
+    try {
+      const createdPlayer = await repository.create(player);
+      response.status(201).location(`/api/players/${createdPlayer.id}`).json({ player: createdPlayer });
     } catch (error) {
       next(error);
     }
