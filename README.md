@@ -68,7 +68,7 @@ gcloud secrets versions access latest \
   --project=YOUR_GCP_PROJECT_ID
 ```
 
-The current demo is available at [the Tenisu API](https://tenisu-api-2odleubxdq-ew.a.run.app); its [Swagger UI](https://tenisu-api-2odleubxdq-ew.a.run.app/api-docs/) documents the routes.
+The current demo exposes [the player list](https://tenisu-api-2odleubxdq-ew.a.run.app/api/players) and [player statistics](https://tenisu-api-2odleubxdq-ew.a.run.app/api/statistics). Its [Swagger UI](https://tenisu-api-2odleubxdq-ew.a.run.app/api-docs/) documents the routes. The base URL has no homepage; open one of these routes instead.
 
 Cloud costs depend on region, usage, and retained resources. Stopping Cloud SQL removes instance compute charges, but storage remains billable. See [Cloud SQL pricing](https://cloud.google.com/sql/pricing), [Cloud Run pricing](https://cloud.google.com/run/pricing), [Cloud Build pricing](https://cloud.google.com/build/pricing), and [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing).
 
@@ -155,7 +155,7 @@ For an existing deployment, the script switches the API to the restricted accoun
 ## API documentation
 
 The API contract is documented in the [OpenAPI specification](docs/api/openapi.yaml).
-When the server is running, open [http://localhost:3000/api-docs/](http://localhost:3000/api-docs/) to explore it in Swagger UI. Swagger uses the host where it is opened, so **Try it out** calls the local API locally and the deployed API online.
+After starting the project on your computer, open [local Swagger UI](http://localhost:3000/api-docs/). Links to `localhost` require a running local server; to try the API directly from this README without installing it, use [online Swagger UI](https://tenisu-api-2odleubxdq-ew.a.run.app/api-docs/). Swagger uses the host where it is opened, so **Try it out** calls the local API locally and the deployed API online.
 
 ### `GET /api/statistics`
 
