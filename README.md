@@ -155,7 +155,7 @@ For an existing deployment, the script switches the API to the restricted accoun
 ## API documentation
 
 The API contract is documented in the [OpenAPI specification](docs/api/openapi.yaml).
-When the server is running, open [http://localhost:3000/api-docs/](http://localhost:3000/api-docs/) to explore it in Swagger UI.
+When the server is running, open [http://localhost:3000/api-docs/](http://localhost:3000/api-docs/) to explore it in Swagger UI. Swagger uses the host where it is opened, so **Try it out** calls the local API locally and the deployed API online.
 
 ### `GET /api/statistics`
 

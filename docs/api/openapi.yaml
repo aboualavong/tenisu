@@ -4,8 +4,8 @@ info:
   version: 1.0.0
   description: REST API for retrieving player statistics and managing player records.
 servers:
-  - url: http://localhost:3000
-    description: Local development server
+  - url: /
+    description: API on the current host (local or deployed)
 paths:
   /api/statistics:
     get:
