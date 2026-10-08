@@ -1,0 +1,248 @@
+{
+  "info": {
+    "_postman_id": "268b2a10-0f2a-4eca-9f93-669e62273b3a",
+    "name": "Tenisu API",
+    "description": "Select Tenisu - Local or Tenisu - Online. Read endpoints are public. Creation requires the environment-specific api_key. Run the Read requests folder for checks without changing data; the Write requests folder creates persistent players. API contract: docs/api/openapi.yaml.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "Read requests",
+      "item": [
+        {
+          "name": "List players",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/players",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "players"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Players array\", function () { pm.expect(pm.response.json().players).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get player by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/players/{{player_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "players",
+                "{{player_id}}"
+              ]
+            },
+            "description": "Uses player_id from the selected environment; defaults to seeded player 17."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Requested player\", function () { pm.expect(pm.response.json().player.id).to.eql(Number(pm.environment.get(\"player_id\"))); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/statistics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "statistics"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Statistics fields\", function () { pm.expect(pm.response.json().statistics).to.have.all.keys(\"countryWithHighestWinRatio\", \"averageBmi\", \"medianHeightCm\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api-docs/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api-docs",
+                ""
+              ]
+            },
+            "description": "Open this URL in a browser to use the interactive documentation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Write requests",
+      "description": "Manual player creation. Running this folder writes to the selected database.",
+      "item": [
+        {
+          "name": "Create player",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "X-API-Key",
+                  "type": "string"
+                },
+                {
+                  "key": "value",
+                  "value": "{{api_key}}",
+                  "type": "string"
+                },
+                {
+                  "key": "in",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstname\": \"Coco\",\n  \"lastname\": \"Gauff\",\n  \"shortname\": \"C.GAU\",\n  \"sex\": \"F\",\n  \"country\": {\n    \"picture\": \"https://example.com/usa.png\",\n    \"code\": \"USA\"\n  },\n  \"picture\": \"https://example.com/gauff.png\",\n  \"data\": {\n    \"rank\": 3,\n    \"points\": 7200,\n    \"weight\": 55000,\n    \"height\": 175,\n    \"age\": 20,\n    \"last\": [\n      1,\n      1,\n      0,\n      1,\n      1\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/players",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "players"
+              ]
+            },
+            "description": "Creates a persistent player in the selected environment. Set api_key first and edit the body as needed. Do not include an id. On success, player_id is updated to the new player ID. Each send creates a new player; the API has no delete endpoint."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"api_key\")) {",
+                  "  throw new Error(\"Set api_key in the selected Tenisu environment before creating a player.\");",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) {",
+                  "  const player = pm.response.json().player;",
+                  "  pm.test(\"Generated ID\", function () { pm.expect(player.id).to.be.a(\"number\"); pm.expect(player.id).to.be.above(0); });",
+                  "  pm.test(\"Resource Location\", function () { pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/players/\" + player.id); });",
+                  "  pm.environment.set(\"player_id\", String(player.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}
