@@ -14,14 +14,16 @@
     "db:setup": "npm run db:migrate && npm run db:seed",
     "local:start": "docker compose up --build -d",
     "local:stop": "docker compose stop",
-    "local:restart": "docker compose restart",
+    "local:restart": "docker compose up --force-recreate --wait --wait-timeout 120",
     "local:status": "docker compose ps --all",
     "local:logs": "docker compose logs --follow",
     "cloud:deploy": "bash scripts/deploy-gcp.sh",
     "cloud:start": "bash scripts/cloud.sh start",
     "cloud:stop": "bash scripts/cloud.sh stop",
     "cloud:restart": "bash scripts/cloud.sh restart",
-    "cloud:status": "bash scripts/cloud.sh status"
+    "cloud:status": "bash scripts/cloud.sh status",
+    "db:setup:cloud": "npm run db:setup && node dist/database/configure-runtime.js",
+    "cloud:seed": "bash scripts/cloud.sh seed"
   },
   "engines": {
     "node": ">=26"

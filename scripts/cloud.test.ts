@@ -48,3 +48,17 @@ test("does not enable the API if starting SQL fails", () => {
   expect(result.status).not.toBe(0);
   expect(result.calls).not.toContain("--scaling=auto");
 });
+
+test("seeds the deployed database through the setup job and waits for completion", () => {
+  const result = run("seed");
+  expect(result.status).toBe(0);
+  expect(result.calls).toContain("run jobs execute tenisu-db-setup --project=test-project --region=europe-west1 --args=run,db:seed --wait");
+  expect(result.calls).not.toContain("jobs deploy");
+  expect(result.calls).not.toContain("sql instances patch");
+});
+
+test("reports a failed cloud seed execution", () => {
+  const result = run("seed", "run jobs execute");
+  expect(result.status).not.toBe(0);
+  expect(result.calls).toContain("run jobs execute");
+});

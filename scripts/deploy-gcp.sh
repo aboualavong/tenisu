@@ -8,9 +8,13 @@ readonly JOB_NAME="tenisu-db-setup"
 readonly REPOSITORY_NAME="tenisu"
 readonly SQL_INSTANCE_NAME="tenisu-postgres"
 readonly DATABASE_NAME="tenisu"
-readonly DATABASE_USER="tenisu_app"
+# Keep the original user and secret for setup so existing table ownership is preserved.
+readonly SETUP_DATABASE_USER="tenisu_app"
+readonly RUNTIME_DATABASE_USER="tenisu_api"
+readonly SETUP_SERVICE_ACCOUNT="tenisu-setup"
 readonly RUNTIME_SERVICE_ACCOUNT="tenisu-runtime"
-readonly DATABASE_PASSWORD_SECRET="tenisu-database-password"
+readonly SETUP_PASSWORD_SECRET="tenisu-database-password"
+readonly RUNTIME_PASSWORD_SECRET="tenisu-runtime-database-password"
 readonly PLAYER_KEY_SECRET="tenisu-player-write-api-key"
 readonly REGION="${GCP_REGION:-europe-west1}"
 
@@ -92,33 +96,40 @@ fi
 INSTANCE_CONNECTION_NAME="$(gcloud sql instances describe "$SQL_INSTANCE_NAME" \
   --project="$PROJECT_ID" --format='value(connectionName)')"
 
-ensure_secret "$DATABASE_PASSWORD_SECRET"
+ensure_secret "$SETUP_PASSWORD_SECRET"
 ensure_secret "$PLAYER_KEY_SECRET"
+ensure_secret "$RUNTIME_PASSWORD_SECRET"
 
 DATABASE_PASSWORD=""
-if [[ -z "$(gcloud secrets versions list "$DATABASE_PASSWORD_SECRET" --project="$PROJECT_ID" \
+if [[ -z "$(gcloud secrets versions list "$SETUP_PASSWORD_SECRET" --project="$PROJECT_ID" \
   --filter='state=ENABLED' --format='value(name)')" ]]; then
   DATABASE_PASSWORD="$(openssl rand -hex 32)"
-  printf '%s' "$DATABASE_PASSWORD" | gcloud secrets versions add "$DATABASE_PASSWORD_SECRET" \
+  printf '%s' "$DATABASE_PASSWORD" | gcloud secrets versions add "$SETUP_PASSWORD_SECRET" \
     --project="$PROJECT_ID" --data-file=-
-  if [[ -n "$(gcloud sql users list --instance="$SQL_INSTANCE_NAME" --project="$PROJECT_ID" \
-    --filter="name=$DATABASE_USER" --format='value(name)')" ]]; then
-    gcloud sql users set-password "$DATABASE_USER" \
-      --instance="$SQL_INSTANCE_NAME" --project="$PROJECT_ID" \
-      --password="$DATABASE_PASSWORD"
-  fi
 else
   DATABASE_PASSWORD="$(gcloud secrets versions access latest \
-    --secret="$DATABASE_PASSWORD_SECRET" --project="$PROJECT_ID")"
+    --secret="$SETUP_PASSWORD_SECRET" --project="$PROJECT_ID")"
 fi
 
 if [[ -z "$(gcloud sql users list --instance="$SQL_INSTANCE_NAME" --project="$PROJECT_ID" \
-  --filter="name=$DATABASE_USER" --format='value(name)')" ]]; then
-  gcloud sql users create "$DATABASE_USER" \
+  --filter="name=$SETUP_DATABASE_USER" --format='value(name)')" ]]; then
+  gcloud sql users create "$SETUP_DATABASE_USER" \
+    --instance="$SQL_INSTANCE_NAME" --project="$PROJECT_ID" \
+    --password="$DATABASE_PASSWORD"
+else
+  gcloud sql users set-password "$SETUP_DATABASE_USER" \
     --instance="$SQL_INSTANCE_NAME" --project="$PROJECT_ID" \
     --password="$DATABASE_PASSWORD"
 fi
 unset DATABASE_PASSWORD
+
+# Create the runtime PostgreSQL role through SQL in the setup job. Cloud SQL's
+# default user creation grants cloudsqlsuperuser, which the API must not have.
+if [[ -z "$(gcloud secrets versions list "$RUNTIME_PASSWORD_SECRET" --project="$PROJECT_ID" \
+  --filter='state=ENABLED' --format='value(name)')" ]]; then
+  openssl rand -hex 32 | tr -d '\n' | gcloud secrets versions add "$RUNTIME_PASSWORD_SECRET" \
+    --project="$PROJECT_ID" --data-file=-
+fi
 
 if [[ -z "$(gcloud secrets versions list "$PLAYER_KEY_SECRET" --project="$PROJECT_ID" \
   --filter='state=ENABLED' --format='value(name)')" ]]; then
@@ -135,17 +146,19 @@ if ! gcloud artifacts repositories describe "$REPOSITORY_NAME" \
     --project="$PROJECT_ID"
 fi
 
-if ! gcloud iam service-accounts describe \
-  "$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-  --project="$PROJECT_ID" >/dev/null 2>&1; then
-  gcloud iam service-accounts create "$RUNTIME_SERVICE_ACCOUNT" \
-    --display-name="Tenisu Cloud Run runtime" \
-    --project="$PROJECT_ID"
-fi
+for service_account in "$RUNTIME_SERVICE_ACCOUNT" "$SETUP_SERVICE_ACCOUNT"; do
+  if ! gcloud iam service-accounts describe \
+    "$service_account@$PROJECT_ID.iam.gserviceaccount.com" \
+    --project="$PROJECT_ID" >/dev/null 2>&1; then
+    gcloud iam service-accounts create "$service_account" \
+      --display-name="Tenisu $service_account" --project="$PROJECT_ID"
+  fi
+done
 
 BUILD_SERVICE_ACCOUNT="$(gcloud builds get-default-service-account \
   --region="$REGION" --project="$PROJECT_ID" \
   --format='value(serviceAccountEmail)')"
+BUILD_SERVICE_ACCOUNT="${BUILD_SERVICE_ACCOUNT##*/serviceAccounts/}"
 if [[ -z "$BUILD_SERVICE_ACCOUNT" ]]; then
   echo "Could not determine the Cloud Build service account." >&2
   exit 1
@@ -177,22 +190,26 @@ retry_iam_command gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$BUILD_SERVICE_ACCOUNT" \
   --role=roles/logging.logWriter >/dev/null
 
-retry_iam_command gcloud artifacts repositories add-iam-policy-binding "$REPOSITORY_NAME" \
-  --location="$REGION" \
-  --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role=roles/artifactregistry.reader \
-  --project="$PROJECT_ID" >/dev/null
-
-for secret_name in "$DATABASE_PASSWORD_SECRET" "$PLAYER_KEY_SECRET"; do
-  retry_iam_command gcloud secrets add-iam-policy-binding "$secret_name" \
-    --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role=roles/secretmanager.secretAccessor \
-    --project="$PROJECT_ID" >/dev/null
+for service_account in "$RUNTIME_SERVICE_ACCOUNT" "$SETUP_SERVICE_ACCOUNT"; do
+  retry_iam_command gcloud artifacts repositories add-iam-policy-binding "$REPOSITORY_NAME" \
+    --location="$REGION" \
+    --member="serviceAccount:$service_account@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role=roles/artifactregistry.reader --project="$PROJECT_ID" >/dev/null
+  retry_iam_command gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$service_account@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role=roles/cloudsql.client >/dev/null
 done
 
-retry_iam_command gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role=roles/cloudsql.client >/dev/null
+for secret_name in "$RUNTIME_PASSWORD_SECRET" "$PLAYER_KEY_SECRET"; do
+  retry_iam_command gcloud secrets add-iam-policy-binding "$secret_name" \
+    --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role=roles/secretmanager.secretAccessor --project="$PROJECT_ID" >/dev/null
+done
+for secret_name in "$SETUP_PASSWORD_SECRET" "$RUNTIME_PASSWORD_SECRET"; do
+  retry_iam_command gcloud secrets add-iam-policy-binding "$secret_name" \
+    --member="serviceAccount:$SETUP_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role=roles/secretmanager.secretAccessor --project="$PROJECT_ID" >/dev/null
+done
 
 IMAGE_TAG="$(git rev-parse --short HEAD)-$(date -u +%Y%m%d%H%M%S)"
 IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY_NAME/api:$IMAGE_TAG"
@@ -206,15 +223,15 @@ gcloud run jobs deploy "$JOB_NAME" \
   --image="$IMAGE" \
   --region="$REGION" \
   --project="$PROJECT_ID" \
-  --service-account="$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+  --service-account="$SETUP_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
   --command=npm \
-  --args=run,db:setup \
+  --args=run,db:setup:cloud \
   --set-cloudsql-instances="$INSTANCE_CONNECTION_NAME" \
   --tasks=1 \
   --max-retries=1 \
   --task-timeout=5m \
-  --set-env-vars="CLOUD_SQL_CONNECTION_NAME=$INSTANCE_CONNECTION_NAME,DATABASE_USER=$DATABASE_USER,DATABASE_NAME=$DATABASE_NAME,DATABASE_POOL_SIZE=2" \
-  --set-secrets="DATABASE_PASSWORD=$DATABASE_PASSWORD_SECRET:latest"
+  --set-env-vars="CLOUD_SQL_CONNECTION_NAME=$INSTANCE_CONNECTION_NAME,DATABASE_USER=$SETUP_DATABASE_USER,DATABASE_NAME=$DATABASE_NAME,DATABASE_POOL_SIZE=2" \
+  --set-secrets="DATABASE_PASSWORD=$SETUP_PASSWORD_SECRET:latest,RUNTIME_DATABASE_PASSWORD=$RUNTIME_PASSWORD_SECRET:latest"
 
 gcloud run jobs execute "$JOB_NAME" \
   --region="$REGION" --project="$PROJECT_ID" --wait
@@ -234,8 +251,18 @@ gcloud run deploy "$SERVICE_NAME" \
   --min=0 \
   --max=1 \
   --concurrency=80 \
-  --set-env-vars="CLOUD_SQL_CONNECTION_NAME=$INSTANCE_CONNECTION_NAME,DATABASE_USER=$DATABASE_USER,DATABASE_NAME=$DATABASE_NAME,DATABASE_POOL_SIZE=2" \
-  --set-secrets="DATABASE_PASSWORD=$DATABASE_PASSWORD_SECRET:latest,PLAYER_WRITE_API_KEY=$PLAYER_KEY_SECRET:latest"
+  --set-env-vars="CLOUD_SQL_CONNECTION_NAME=$INSTANCE_CONNECTION_NAME,DATABASE_USER=$RUNTIME_DATABASE_USER,DATABASE_NAME=$DATABASE_NAME,DATABASE_POOL_SIZE=2" \
+  --set-secrets="DATABASE_PASSWORD=$RUNTIME_PASSWORD_SECRET:latest,PLAYER_WRITE_API_KEY=$PLAYER_KEY_SECRET:latest"
+
+# Migrate the old deployment: its runtime identity could read the setup secret.
+if [[ -n "$(gcloud secrets get-iam-policy "$SETUP_PASSWORD_SECRET" \
+  --project="$PROJECT_ID" --flatten='bindings[].members' \
+  --filter="bindings.role:roles/secretmanager.secretAccessor AND bindings.members:serviceAccount:$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+  --format='value(bindings.members)')" ]]; then
+  gcloud secrets remove-iam-policy-binding "$SETUP_PASSWORD_SECRET" \
+    --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role=roles/secretmanager.secretAccessor --project="$PROJECT_ID" >/dev/null
+fi
 
 gcloud run services describe "$SERVICE_NAME" \
   --region="$REGION" --project="$PROJECT_ID" \

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 case "${1:-}" in
-  start|stop|restart|status) action="$1" ;;
-  *) echo "Usage: bash scripts/cloud.sh {start|stop|restart|status}" >&2; exit 2 ;;
+  start|stop|restart|status|seed) action="$1" ;;
+  *) echo "Usage: bash scripts/cloud.sh {start|stop|restart|status|seed}" >&2; exit 2 ;;
 esac
 command -v gcloud >/dev/null || { echo "gcloud is required." >&2; exit 1; }
 project="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
@@ -28,6 +28,10 @@ case "$action" in
   start) start ;;
   stop) stop ;;
   restart) stop; start ;;
+  seed)
+    echo "Loading headtohead.json from the deployed image; existing sample players will be updated by ID."
+    gcloud run jobs execute tenisu-db-setup --project="$project" --region="$region" --args=run,db:seed --wait
+    ;;
   status)
     gcloud run services describe tenisu-api --project="$project" --region="$region" --format=yaml
     gcloud sql instances describe tenisu-postgres --project="$project" --format='yaml(state,settings.activationPolicy)'
